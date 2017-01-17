@@ -6,6 +6,8 @@ import Data.List
 import Text.HTML.TagSoup
 import Codec.Binary.UTF8.String (decodeString)
 import Options.Applicative
+import Control.Monad
+import Debug.Trace
 
 type Title = String
 type Torrents = [String]
@@ -13,19 +15,23 @@ type Torrents = [String]
 data Episode = Episode Title Torrents
 
 instance Show Episode where
-  show (Episode title torrents) = "title\n" ++ unlines torrents
+show (Episode title torrents) = "title\n" ++ unlines torrents
 
 searchUrl :: String -> String
-searchUrl keyword = "http://cn163.net?q=" ++ keyword
-  
+searchUrl keyword = "http://cn163.net/?s=" ++ (urlEncode keyword)
+
 baseUrl :: String
 baseUrl = "http://cn163.net/archives/"
 
 openURL :: String -> IO String
 openURL x = getResponseBody =<< simpleHTTP (getRequest x)
 
-parseSearch :: [Tag String] -> String
-parseSearch = undefined
+parseSearch tags = do
+  let entries = sections (~== "<div class=entry_box>") . takeWhile (~/= "<div id=pagenavi>") . dropWhile (~/= "<div id=content>") $ tags
+  return [(title entry, archive entry) | entry <- entries]
+  where title = dropWhile isSpace . innerText . takeWhile (~/= "</h2>") . dropWhile (~/= "<div class=archive_title>")
+        archive = fromAttrib "href" . head . tail . takeWhile (~/= "</a>") . dropWhile (~/= "<span class=archive_more>")
+
 
 parseTitle :: [Tag String] -> String
 parseTitle = innerText . take 2 . dropWhile (~/= "<title>")
@@ -68,5 +74,10 @@ getTorrents = do
         torrents = parseTorrents tags
     putStrLn $ "torrents: " ++ (unlines torrents)
 
-main :: IO ()
-main = cli
+testSearch = do
+  tags <- (parseTags . decodeString) <$> openURL (searchUrl "生活大爆炸")
+  entries <- parseSearch $ tags
+  putStrLn . unlines . map showEntry $ entries
+  where showEntry (title, archive) = title ++ ": " ++ archive
+
+main = testSearch
