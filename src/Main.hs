@@ -14,7 +14,12 @@ searchUrl :: String -> String
 searchUrl keyword = "http://cn163.net/?s=" ++ (urlEncode keyword)
 
 openURL :: String -> IO String
-openURL x = getResponseBody =<< simpleHTTP (getRequest x)
+openURL x = do
+  response <- simpleHTTP (getRequest x)
+  code <- getResponseCode response
+  putStrLn ("statusCode: " ++ (show code))
+  body <- getResponseBody response
+  return body
 
 parseSearch :: [Tag String] -> [(String, String)]
 parseSearch = map (\c -> (title c, archive c)) . sections (~== "<div class=entry_box>")
@@ -37,6 +42,7 @@ search keyword = do
   tags <- (parseTags . decodeString) <$> openURL (searchUrl keyword)
   let entries = parseSearch $ tags
   putStrLn . unlines . map showEntry . flip zip [0..] $ entries
+  putStrLn "which one: "
   return entries
 
 showEntry :: ((String, String), Integer) -> String
@@ -58,6 +64,5 @@ main = do
   case keyword of
     Params key -> do
       entries <- search key
-      putStr "which one: "
       which <- getLine
       getTorrents . snd $ (entries !! (read which))
