@@ -28,8 +28,12 @@ parseSearch = map (\c -> (title c, archive c)) . sections (~== "<div class=entry
 
 
 parseTorrents :: [Tag String] -> [String]
-parseTorrents = filter (isInfixOf "1024") . map f . sections (~== "<a>") . takeWhile (~/= "<div class=back_b>"). dropWhile (~/= "<div id=entry>")
-  where f = fromAttrib "href" . head 
+parseTorrents = map f . sections goodTag . takeWhile endTag . dropWhile startTag
+  where
+    startTag tag = tag ~/= "<div id=entry>"
+    endTag tag = tag ~/= "<strong>"
+    goodTag tag = tag ~== TagOpen "a" []
+    f = fromAttrib "href" . head 
 
 getTorrents :: String -> IO ()
 getTorrents archiveUrl = do
